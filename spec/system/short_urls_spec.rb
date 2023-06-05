@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require 'rails_helper'
-require 'webdrivers'
-
 # WebDrivers Gem
 # https://github.com/titusfortner/webdrivers
 #
@@ -10,7 +8,7 @@ require 'webdrivers'
 # https://api.rubyonrails.org/v5.2/classes/ActionDispatch/SystemTestCase.html
 
 RSpec.describe 'Short Urls', type: :system do
-  before do
+  before(js: true) do
     driven_by :selenium, using: :chrome
     # If using Firefox
     # driven_by :selenium, using: :firefox
@@ -25,20 +23,29 @@ RSpec.describe 'Short Urls', type: :system do
     it 'shows a list of short urls' do
       visit root_path
       expect(page).to have_text('HeyURL!')
-      # expect page to show 10 urls
     end
   end
 
   describe 'show' do
     it 'shows a panel of stats for a given short url' do
       visit url_path('ABCDE')
-      # expect page to show the short url
+      expect(page).to have_text("The page you were looking for doesn't exist.")
     end
 
     context 'when not found' do
       it 'shows a 404 page' do
         visit url_path('NOTFOUND')
-        # expect page to be a 404
+        expect(page).to have_text("The page you were looking for doesn't exist.")
+      end
+    end
+
+    context 'when url exists' do
+      it 'shows details page' do
+        url = FactoryBot.create(:url)
+
+        visit url_path(url.short_url)
+        expect(page).to have_text(url.short_url)
+        expect(page).to have_text("Original URL: #{url.original_url}")
       end
     end
   end
@@ -47,38 +54,68 @@ RSpec.describe 'Short Urls', type: :system do
     context 'when url is valid' do
       it 'creates the short url' do
         visit '/'
+        build_url = FactoryBot.build(:url)
+        before_count = Url.count
+        find_field('url_original_url').set(build_url.original_url)
+        expect{
+          click_button("Shorten URL")
+        }.to change(Url, :count).by(1)
+        expect(page).to have_text(build_url.original_url)
         # add more expections
       end
 
       it 'redirects to the home page' do
         visit '/'
-        # add more expections
+        build_url = FactoryBot.build(:url)
+        before_count = Url.count
+        find_field('url_original_url').set(build_url.original_url)
+        click_button("Shorten URL")
+        expect(page).to have_text('HeyURL!')
       end
     end
 
     context 'when url is invalid' do
       it 'does not create the short url and shows a message' do
         visit '/'
-        # add more expections
+        visit '/'
+        build_url = FactoryBot.build(:url, original_url: 'thisisrandomtext')
+        before_count = Url.count
+        find_field('url_original_url').set(build_url.original_url)
+        click_button("Shorten URL")
+        expect(page).to have_text('Original url is invalid')
       end
 
       it 'redirects to the home page' do
         visit '/'
-        # add more expections
+        build_url = FactoryBot.build(:url, original_url: 'thisisrandomtext')
+        before_count = Url.count
+        find_field('url_original_url').set(build_url.original_url)
+        click_button("Shorten URL")
+        expect(page).to have_text('HeyURL!')
       end
     end
   end
 
   describe 'visit' do
     it 'redirects the user to the original url' do
-      visit visit_path('ABCDE')
-      # add more expections
+      url = FactoryBot.create(:url)
+      visit visit_path(url.short_url)
+      expect(page.current_url).to eq(url.original_url)
+    end
+
+    it 'Increment url clicks count' do
+      url = FactoryBot.create(:url)
+      expect{
+        visit visit_path(url.short_url)
+      }.to change(Click, :count).by(1)
+      url.reload
+      expect(url.clicks_count).to eq(1)
     end
 
     context 'when not found' do
       it 'shows a 404 page' do
         visit visit_path('NOTFOUND')
-        # expect page to be a 404
+        expect(page).to have_text("The page you were looking for doesn't exist.")
       end
     end
   end
