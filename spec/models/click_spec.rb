@@ -3,17 +3,23 @@
 require 'rails_helper'
 
 RSpec.describe Click, type: :model do
+  let(:current_url){ FactoryBot.create(:url) }
+  subject { described_class.new(url: current_url, browser: 'Chrome', platform: 'windows') }
+
   describe 'validations' do
     it 'validates url_id is valid' do
-      skip 'add test'
+      expect(subject).to be_valid
+
     end
 
     it 'validates browser is not null' do
-      skip 'add test'
+      subject.browser = nil
+      expect(subject).to_not be_valid
     end
 
     it 'validates platform is not null' do
-      skip 'add test'
+      subject.platform = nil
+      expect(subject).to_not be_valid
     end
   end
 end

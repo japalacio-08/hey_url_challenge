@@ -1,52 +1,54 @@
 # frozen_string_literal: true
 
 class UrlsController < ApplicationController
+  before_action :set_url_by_short_url, only: %i[visit show]
+
   def index
     # recent 10 short urls
     @url = Url.new
-    @urls = [
-      Url.new(short_url: 'ABCDE', original_url: 'http://google.com', created_at: Time.now),
-      Url.new(short_url: 'ABCDG', original_url: 'http://facebook.com', created_at: Time.now),
-      Url.new(short_url: 'ABCDF', original_url: 'http://yahoo.com', created_at: Time.now)
-    ]
+    @urls = Url.all
   end
 
   def create
-    raise 'add some code'
-    # create a new URL record
+    @url = Url.new(url_params)
+
+    flash[:notice] = @url.errors.full_messages.to_sentence if !@url.save
+
+    redirect_to urls_path
+  end
+
+  def last_10
+    render json: Url.order('created_at DESC').first(10).to_json(include: %i[clicks])
   end
 
   def show
-    @url = Url.new(short_url: 'ABCDE', original_url: 'http://google.com', created_at: Time.now)
     # implement queries
-    @daily_clicks = [
-      ['1', 13],
-      ['2', 2],
-      ['3', 1],
-      ['4', 7],
-      ['5', 20],
-      ['6', 18],
-      ['7', 10],
-      ['8', 20],
-      ['9', 15],
-      ['10', 5]
-    ]
-    @browsers_clicks = [
-      ['IE', 13],
-      ['Firefox', 22],
-      ['Chrome', 17],
-      ['Safari', 7]
-    ]
-    @platform_clicks = [
-      ['Windows', 13],
-      ['macOS', 22],
-      ['Ubuntu', 17],
-      ['Other', 7]
-    ]
+    @daily_clicks = @url.clicks.order('DATE(created_at) DESC').group('DATE(created_at)').limit(10).pluck(['DATE(created_at)::text', 'count(DATE(created_at))'])
+
+    @browsers_clicks = @url.clicks.group(:browser).pluck([:browser, 'COUNT(browser)'])
+
+    @platform_clicks = @url.clicks.group(:platform).pluck([:platform, 'COUNT(platform)'])
   end
 
   def visit
-    # params[:short_url]
-    render plain: 'redirecting to url...'
+    Click.create!(
+      url_id: @url.id,
+      browser: browser.name,
+      platform: browser.platform.name
+    )
+
+    redirect_to @url.original_url
+  end
+
+  private
+
+  def set_url_by_short_url
+    url = params[:short_url].presence || params[:url]
+    @url = Url.find_by(short_url: url)
+    return not_found_method if @url.blank?
+  end
+
+  def url_params
+    params.require(:url).permit(:original_url)
   end
 end
